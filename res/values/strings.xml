@@ -6,5 +6,8 @@
     <string name="title_activity_main">MainActivity</string>
     <string name="nonetwork">No Network</string>
     <string name="allnet">WIFI+Data</string>
+    <string name="wifiNo3g">Wifi Only</string>
+    <string name="mobiledataonly">mobile Only</string>
+    <string name="set_up_the_network">set up the network</string>
 
 </resources>

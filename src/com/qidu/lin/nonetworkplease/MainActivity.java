@@ -1,15 +1,19 @@
+/**
+ * Author : gooooloo (https://github.com/gooooloo)
+ */
 package com.qidu.lin.nonetworkplease;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.Context;
+import android.net.ConnectivityManager;
 import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.telephony.TelephonyManager;
 import android.view.View;
 
 public class MainActivity extends Activity
@@ -20,20 +24,33 @@ public class MainActivity extends Activity
 	{
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
-
+		setTitle(R.string.set_up_the_network);
 	}
 
 	public void noNetwork(View v)
 	{
-		setWifi(v, false);
-		set3gNoThrow(false);
-		afterWork();
+		doJob(false, false);
+	}
+
+	public void onWifiOnly(View v)
+	{
+		doJob(true, false);
+	}
+
+	public void onDataOnly(View v)
+	{
+		doJob(false, true);
 	}
 
 	public void onAllNetwork(View v)
 	{
-		setWifi(v, true);
-		set3gNoThrow(true);
+		doJob(true, true);
+	}
+
+	private void doJob(boolean wifiEnabled, boolean dataEnabled)
+	{
+		setWifi(wifiEnabled);
+		set3gNoThrow(dataEnabled);
 		afterWork();
 	}
 
@@ -80,7 +97,6 @@ public class MainActivity extends Activity
 				}
 				catch (InterruptedException e)
 				{
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				return null;
@@ -92,7 +108,7 @@ public class MainActivity extends Activity
 	{
 		try
 		{
-			set3g(isEnabled);
+			setMobileDataEnabled(this, isEnabled);
 			return true;
 		}
 		catch (IllegalArgumentException e)
@@ -115,49 +131,45 @@ public class MainActivity extends Activity
 		{
 			e.printStackTrace();
 		}
+		catch (NoSuchFieldException e)
+		{
+			e.printStackTrace();
+		}
 		return false;
 	}
 
-	private void set3g(boolean isEnabled) throws ClassNotFoundException, NoSuchMethodException, IllegalArgumentException,
-			IllegalAccessException, InvocationTargetException
+	/**
+	 * this method is copied from
+	 * http://stackoverflow.com/questions/3644144/how-
+	 * to-disable-mobile-data-on-android, Vladimir Sorokin's answer.
+	 * 
+	 * @param context
+	 * @param enabled
+	 * @throws ClassNotFoundException
+	 * @throws NoSuchFieldException
+	 * @throws IllegalArgumentException
+	 * @throws IllegalAccessException
+	 * @throws NoSuchMethodException
+	 * @throws InvocationTargetException
+	 */
+	private void setMobileDataEnabled(Context context, boolean enabled) throws ClassNotFoundException, NoSuchFieldException,
+			IllegalArgumentException, IllegalAccessException, NoSuchMethodException, InvocationTargetException
 	{
-		Method dataConnSwitchmethod;
-		Class telephonyManagerClass;
-		Object ITelephonyStub;
-		Class ITelephonyClass;
+		final ConnectivityManager conman = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+		final Class<?> conmanClass = Class.forName(conman.getClass().getName());
+		final Field iConnectivityManagerField = conmanClass.getDeclaredField("mService");
+		iConnectivityManagerField.setAccessible(true);
+		final Object iConnectivityManager = iConnectivityManagerField.get(conman);
+		final Class<?> iConnectivityManagerClass = Class.forName(iConnectivityManager.getClass().getName());
+		final Method setMobileDataEnabledMethod = iConnectivityManagerClass.getDeclaredMethod("setMobileDataEnabled", Boolean.TYPE);
+		setMobileDataEnabledMethod.setAccessible(true);
 
-		TelephonyManager telephonyManager = (TelephonyManager) this.getSystemService(Context.TELEPHONY_SERVICE);
-
-		if (telephonyManager.getDataState() == TelephonyManager.DATA_CONNECTED)
-		{
-			isEnabled = true;
-		}
-		else
-		{
-			isEnabled = false;
-		}
-
-		telephonyManagerClass = Class.forName(telephonyManager.getClass().getName());
-		Method getITelephonyMethod = telephonyManagerClass.getDeclaredMethod("getITelephony");
-		getITelephonyMethod.setAccessible(true);
-		ITelephonyStub = getITelephonyMethod.invoke(telephonyManager);
-		ITelephonyClass = Class.forName(ITelephonyStub.getClass().getName());
-
-		if (isEnabled)
-		{
-			dataConnSwitchmethod = ITelephonyClass.getDeclaredMethod("disableDataConnectivity");
-		}
-		else
-		{
-			dataConnSwitchmethod = ITelephonyClass.getDeclaredMethod("enableDataConnectivity");
-		}
-		dataConnSwitchmethod.setAccessible(true);
-		dataConnSwitchmethod.invoke(ITelephonyStub);
+		setMobileDataEnabledMethod.invoke(iConnectivityManager, enabled);
 	}
 
-	private void setWifi(View v, boolean status)
+	private void setWifi(boolean status)
 	{
-		WifiManager wifiManager = (WifiManager) v.getContext().getSystemService(Context.WIFI_SERVICE);
+		WifiManager wifiManager = (WifiManager) this.getSystemService(Context.WIFI_SERVICE);
 		wifiManager.setWifiEnabled(status);
 	}
 }
