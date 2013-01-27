@@ -48,7 +48,7 @@ public class MainActivity extends Activity
 		doJob(true, true);
 	}
 
-	private void doJob(boolean wifiEnabled, boolean dataEnabled)
+	private void doJob(final boolean wifiEnabled, final boolean dataEnabled)
 	{
 		setWifi(wifiEnabled);
 		set3gNoThrow(dataEnabled);
@@ -88,6 +88,18 @@ public class MainActivity extends Activity
 			@Override
 			protected Void doInBackground(Void... arg0)
 			{
+				// skip the background waiting once contition matched.
+				// but we can't do this for wifi/data, because even the status
+				// is enabled, the Android system status bar's ui won't be
+				// updated right away, so our UI also shows progress indicator.
+				if (!wifiEnabled && !dataEnabled)
+				{
+					if (detectWifiDisabled() && detect3gDisabledNoThrow())
+					{
+						return null;
+					}
+				}
+
 				try
 				{
 					Thread.sleep(DURATION);
@@ -99,6 +111,33 @@ public class MainActivity extends Activity
 				return null;
 			}
 		}.execute();
+	}
+
+	private boolean detectWifiDisabled()
+	{
+		return ((WifiManager) this.getSystemService(Context.WIFI_SERVICE)).getWifiState() == WifiManager.WIFI_STATE_DISABLED;
+	}
+
+	private boolean detect3gDisabledNoThrow()
+	{
+		try
+		{
+			int currentapiVersion = android.os.Build.VERSION.SDK_INT;
+			if (currentapiVersion >= android.os.Build.VERSION_CODES.GINGERBREAD)
+			{
+				return !detectMobileDataEnabledNew();
+			}
+			else
+			{
+				// can't detect for this old sdk version.
+				return false;
+			}
+		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+		return false;
 	}
 
 	private boolean set3gNoThrow(boolean isEnabled)
@@ -167,16 +206,33 @@ public class MainActivity extends Activity
 	private void setMobileDataEnabledNew(Context context, boolean enabled) throws ClassNotFoundException, NoSuchFieldException,
 			IllegalArgumentException, IllegalAccessException, NoSuchMethodException, InvocationTargetException
 	{
-		final ConnectivityManager conman = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-		final Class<?> conmanClass = Class.forName(conman.getClass().getName());
-		final Field iConnectivityManagerField = conmanClass.getDeclaredField("mService");
-		iConnectivityManagerField.setAccessible(true);
-		final Object iConnectivityManager = iConnectivityManagerField.get(conman);
+		final Object iConnectivityManager = getConnectivityManagerObject();
 		final Class<?> iConnectivityManagerClass = Class.forName(iConnectivityManager.getClass().getName());
 		final Method setMobileDataEnabledMethod = iConnectivityManagerClass.getDeclaredMethod("setMobileDataEnabled", Boolean.TYPE);
 		setMobileDataEnabledMethod.setAccessible(true);
 
 		setMobileDataEnabledMethod.invoke(iConnectivityManager, enabled);
+	}
+
+	private boolean detectMobileDataEnabledNew() throws ClassNotFoundException, NoSuchFieldException, IllegalArgumentException,
+			IllegalAccessException, NoSuchMethodException, InvocationTargetException
+	{
+		final Object iConnectivityManager = getConnectivityManagerObject();
+		final Class<?> iConnectivityManagerClass = Class.forName(iConnectivityManager.getClass().getName());
+		final Method setMobileDataEnabledMethod = iConnectivityManagerClass.getDeclaredMethod("getMobileDataEnabled");
+		setMobileDataEnabledMethod.setAccessible(true);
+
+		return (Boolean) setMobileDataEnabledMethod.invoke(iConnectivityManager);
+	}
+
+	private Object getConnectivityManagerObject() throws ClassNotFoundException, NoSuchFieldException, IllegalArgumentException,
+			IllegalAccessException
+	{
+		final ConnectivityManager conman = (ConnectivityManager) this.getSystemService(Context.CONNECTIVITY_SERVICE);
+		final Class<?> conmanClass = Class.forName(conman.getClass().getName());
+		final Field iConnectivityManagerField = conmanClass.getDeclaredField("mService");
+		iConnectivityManagerField.setAccessible(true);
+		return iConnectivityManagerField.get(conman);
 	}
 
 	/**
