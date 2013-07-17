@@ -16,17 +16,6 @@
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:theme="@android:style/Theme.Holo.Dialog" >
-        <receiver
-            android:name=".ExampleAppWidgetProvider"
-            android:exported="false" >
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/appwidget_provider" />
-
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-        </receiver>
 
         <activity
             android:name=".MainActivity"
